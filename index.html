@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reporte de Servicio | Zoomlion</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f4f6f8;margin:0;color:#222}
+.container{max-width:650px;margin:auto;padding:20px}
+.card{background:white;border-radius:16px;padding:24px;box-shadow:0 3px 15px #0001}
+h1{margin:0 0 5px;font-size:25px}.sub{color:#666;margin-bottom:22px}
+label{display:block;font-weight:bold;margin:14px 0 6px}
+input,select,textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #ccc;border-radius:9px;font-size:16px}
+textarea{min-height:120px;resize:vertical}
+button{width:100%;padding:14px;border:0;border-radius:10px;font-size:17px;font-weight:bold;cursor:pointer;margin-top:20px}
+#send{background:#111;color:#fff}.note{font-size:13px;color:#666;margin-top:12px}
+#status{margin-top:16px;text-align:center;font-weight:bold}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="card">
+<h1>Reporte de Servicio</h1>
+<div class="sub">ZOOMLION · Línea Agrícola</div>
+
+<form id="form">
+<label>Nombre *</label><input name="nombre" required>
+<label>Empresa / Cliente *</label><input name="empresa" required>
+<label>Estado *</label>
+<select name="estado" required>
+<option value="">Selecciona...</option>
+<option>Aguascalientes</option><option>Baja California</option><option>Baja California Sur</option>
+<option>Chihuahua</option><option>Coahuila</option><option>Colima</option><option>Durango</option>
+<option>Guanajuato</option><option>Jalisco</option><option>Michoacán</option><option>Nayarit</option>
+<option>Nuevo León</option><option>Querétaro</option><option>Sinaloa</option><option>Sonora</option>
+<option>Yucatán</option><option>Otro</option>
+</select>
+
+<label>Modelo de máquina *</label><input name="modelo" placeholder="Ej. DV3504" required>
+<label>Número de serie *</label><input name="serie" required>
+<label>Horas de trabajo</label><input name="horas" type="number" min="0">
+<label>Número de parte</label><input name="parte" placeholder="Ej. 1009807308">
+
+<label>Prioridad *</label>
+<select name="prioridad" required>
+<option>Normal</option><option>Urgente</option><option>Máquina detenida</option>
+</select>
+
+<label>Descripción del problema *</label>
+<textarea name="problema" required placeholder="Describe la falla, síntomas, cuándo comenzó, etc."></textarea>
+
+<label>Fotografías *</label>
+<input id="fotos" type="file" accept="image/*" multiple required>
+<div class="note">Puedes seleccionar varias fotografías. Recomendado: máximo 8.</div>
+
+<button id="send" type="submit">ENVIAR REPORTE</button>
+<div id="status"></div>
+</form>
+</div>
+</div>
+
+<script>
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz4bdUPYmBGmHpwBpVwJ-eCqS6JFF1_jRqGtzJYveyh9DUBecm61AcvS1osWN_STQ61cg/exec";
+
+const form = document.getElementById("form");
+form.addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const status=document.getElementById("status");
+  const button=document.getElementById("send");
+  const files=[...document.getElementById("fotos").files];
+
+  if(!files.length){status.textContent="Agrega al menos una fotografía.";return}
+  if(files.length>8){status.textContent="Máximo 8 fotografías.";return}
+  if(SCRIPT_URL.includes("PEGA_AQUI")){
+    status.textContent="Primero configura la URL de Google Apps Script.";
+    return;
+  }
+
+  button.disabled=true; button.textContent="ENVIANDO...";
+  status.textContent="Subiendo fotografías y generando reporte...";
+
+  const data=Object.fromEntries(new FormData(form).entries());
+  data.fotos=[];
+
+  for(const file of files){
+    const base64=await toBase64(file);
+    data.fotos.push({name:file.name,mimeType:file.type,data:base64.split(",")[1]});
+  }
+
+  try{
+    const response=await fetch(SCRIPT_URL,{
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify(data)
+    });
+    const result=await response.json();
+
+    if(!result.ok) throw new Error(result.error||"Error desconocido");
+
+    status.textContent="Reporte creado: "+result.reporte;
+    form.reset();
+
+    const wa=encodeURIComponent(
+      "🔧 REPORTE DE SERVICIO ZOOMLION\n\n"+
+      "Reporte: "+result.reporte+"\n"+
+      "Cliente: "+data.empresa+"\n"+
+      "Contacto: "+data.nombre+"\n"+
+      "Estado: "+data.estado+"\n"+
+      "Máquina: "+data.modelo+"\n"+
+      "Serie: "+data.serie+"\n"+
+      "Horas: "+(data.horas||"No indicado")+"\n"+
+      "Refacción: "+(data.parte||"No indicada")+"\n"+
+      "Prioridad: "+data.prioridad+"\n\n"+
+      "📝 Problema:\n"+data.problema+"\n\n"+
+      "📸 Fotografías:\n"+result.folderUrl
+    );
+    window.location.href="https://wa.me/529811211001?text="+wa;
+  }catch(err){
+    status.textContent="No se pudo enviar: "+err.message;
+    button.disabled=false; button.textContent="ENVIAR REPORTE";
+  }
+});
+
+function toBase64(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(r.result);
+    r.onerror=reject;
+    r.readAsDataURL(file);
+  });
+}
+</script>
+</body>
+</html>
